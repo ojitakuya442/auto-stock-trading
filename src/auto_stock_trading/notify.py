@@ -6,7 +6,7 @@ from typing import Any
 
 import requests
 
-from auto_stock_trading.config import DISCORD_WEBHOOK_URL
+from auto_stock_trading.config import DISCORD_WEBHOOK_URL, label
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def notify_morning_signal(
     rank_lines = []
     for i, t in enumerate(long_tickers, start=1):
         pred = predicted_returns.get(t, 0.0)
-        rank_lines.append(f"`{i}.` **{t}** (予測: {pred:+.4f})")
+        rank_lines.append(f"`{i}.` **{label(t, with_companies=True)}**\n　　 予測: {pred:+.4f}")
 
     fields = [
         {"name": "ロング対象銘柄", "value": "\n".join(rank_lines) if rank_lines else "（なし）", "inline": False},
@@ -77,13 +77,13 @@ def notify_orders_executed(trades: list[dict], skipped: list[dict] | None = None
     for t in trades:
         emoji = "🟢" if t["side"] == "BUY" else "🔴"
         qty_str = f"{int(t['qty'])}口" if t['qty'] == int(t['qty']) else f"{t['qty']:.2f}口"
-        lines.append(f"{emoji} {t['side']} **{t['symbol']}** {qty_str} @ ¥{t['price']:,.0f}")
+        lines.append(f"{emoji} {t['side']} **{label(t['symbol'])}** {qty_str} @ ¥{t['price']:,.0f}")
 
     if skipped:
         lines.append("")
         lines.append("**⏭️ スキップ:**")
         for s in skipped:
-            lines.append(f"・{s['symbol']}: {s['reason']}")
+            lines.append(f"・{label(s['symbol'])}: {s['reason']}")
 
     embed = {
         "title": "✅ 仮想約定",
@@ -121,7 +121,7 @@ def notify_daily_summary(
         pos_lines = []
         for p in positions_detail[:10]:
             qty_str = f"{int(p['qty'])}口" if p['qty'] == int(p['qty']) else f"{p['qty']:.2f}口"
-            pos_lines.append(f"`{p['symbol']}` {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
+            pos_lines.append(f"**{label(p['symbol'])}** {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
         if pos_lines:
             fields.append({"name": "保有ポジション", "value": "\n".join(pos_lines), "inline": False})
 

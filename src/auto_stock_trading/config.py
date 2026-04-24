@@ -54,6 +54,58 @@ JP_TICKERS: list[str] = [
     "1633.T",  # 不動産
 ]
 
+# 表示用: 銘柄コード → (セクター名, 主な構成銘柄リスト)
+# Discord 通知などで「ETFが何を含んでいるか」を分かりやすく表示するために使用
+TICKER_INFO: dict[str, tuple[str, str]] = {
+    # 日本: NEXT FUNDS TOPIX-17 業種別 ETF (発行: 野村アセット)
+    "1617.T": ("食品", "味の素 / キリンHD / アサヒ / サントリーBF / 明治HD"),
+    "1618.T": ("エネルギー資源", "INPEX / ENEOS / 出光興産"),
+    "1619.T": ("建設・資材", "大成建設 / 清水建設 / 住友大阪セメント"),
+    "1620.T": ("素材・化学", "信越化学 / 三井化学 / 富士フイルム"),
+    "1621.T": ("医薬品", "武田薬品 / 第一三共 / 中外製薬 / エーザイ"),
+    "1622.T": ("自動車・輸送機", "トヨタ / ホンダ / デンソー / SUBARU"),
+    "1623.T": ("鉄鋼・非鉄", "日本製鉄 / JFE / 住友金属鉱山"),
+    "1624.T": ("機械", "ファナック / SMC / ダイキン / コマツ"),
+    "1625.T": ("電機・精密", "ソニーG / キーエンス / 村田製作所 / TDK"),
+    "1626.T": ("情報通信・サービス", "NTT / ソフトバンクG / KDDI / リクルート"),
+    "1627.T": ("電力・ガス", "東京電力 / 関西電力 / 東京ガス"),
+    "1628.T": ("運輸・物流", "JR東日本 / ANA / JAL / 日本郵船"),
+    "1629.T": ("商社・卸売", "三菱商事 / 伊藤忠 / 三井物産 / 丸紅"),
+    "1630.T": ("小売", "ファストリ / セブン&アイ / ニトリ"),
+    "1631.T": ("銀行", "三菱UFJ / 三井住友 / みずほ"),
+    "1632.T": ("金融（除く銀行）", "野村HD / 東京海上 / SBIHD"),
+    "1633.T": ("不動産", "三井不動産 / 三菱地所 / 住友不動産"),
+    # 米国: Select Sector SPDR ETF (発行: State Street)
+    "XLB": ("素材", "Linde / Sherwin-Williams"),
+    "XLC": ("通信サービス", "Meta / Alphabet"),
+    "XLE": ("エネルギー", "ExxonMobil / Chevron"),
+    "XLF": ("金融", "JPMorgan / Bank of America"),
+    "XLI": ("資本財", "GE / Caterpillar"),
+    "XLK": ("情報技術", "Apple / Microsoft / Nvidia"),
+    "XLP": ("生活必需品", "P&G / Coca-Cola"),
+    "XLRE": ("不動産", "Prologis / American Tower"),
+    "XLU": ("公共事業", "NextEra / Duke Energy"),
+    "XLV": ("ヘルスケア", "UnitedHealth / J&J"),
+    "XLY": ("一般消費財", "Amazon / Tesla"),
+}
+
+
+def label(ticker: str, *, with_companies: bool = False) -> str:
+    """銘柄コードを人間が読める形式に整形.
+
+    Examples:
+        label("1630.T") → "小売 (1630.T)"
+        label("1630.T", with_companies=True) → "小売 (1630.T) — ファストリ / セブン&アイ / ニトリ"
+    """
+    info = TICKER_INFO.get(ticker)
+    if info is None:
+        return ticker
+    sector, companies = info
+    if with_companies:
+        return f"{sector} ({ticker}) — {companies}"
+    return f"{sector} ({ticker})"
+
+
 # 日本ETFの業種分類（論文 §4.1 の定義に厳密に従う）
 # 論文: 1618.T, 1625.T, 1629.T, 1631.T = シクリカル
 #       1617.T, 1621.T, 1627.T, 1630.T = ディフェンシブ
