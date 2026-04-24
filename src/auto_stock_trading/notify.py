@@ -77,7 +77,13 @@ def notify_orders_executed(trades: list[dict], skipped: list[dict] | None = None
     for t in trades:
         emoji = "🟢" if t["side"] == "BUY" else "🔴"
         qty_str = f"{int(t['qty'])}口" if t['qty'] == int(t['qty']) else f"{t['qty']:.2f}口"
-        lines.append(f"{emoji} {t['side']} **{label(t['symbol'])}** {qty_str} @ ¥{t['price']:,.0f}")
+        full = label(t['symbol'], with_companies=True)
+        # "小売 (1630.T) — ファストリ / セブン&アイ / ニトリ" を見やすく2行に
+        if " — " in full:
+            head, companies = full.split(" — ", 1)
+            lines.append(f"{emoji} {t['side']} **{head}** {qty_str} @ ¥{t['price']:,.0f}\n　　 _{companies}_")
+        else:
+            lines.append(f"{emoji} {t['side']} **{full}** {qty_str} @ ¥{t['price']:,.0f}")
 
     if skipped:
         lines.append("")
@@ -121,7 +127,14 @@ def notify_daily_summary(
         pos_lines = []
         for p in positions_detail[:10]:
             qty_str = f"{int(p['qty'])}口" if p['qty'] == int(p['qty']) else f"{p['qty']:.2f}口"
-            pos_lines.append(f"**{label(p['symbol'])}** {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
+            full = label(p['symbol'], with_companies=True)
+            if " — " in full:
+                head, companies = full.split(" — ", 1)
+                pos_lines.append(
+                    f"**{head}** {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)\n　　 _{companies}_"
+                )
+            else:
+                pos_lines.append(f"**{full}** {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
         if pos_lines:
             fields.append({"name": "保有ポジション", "value": "\n".join(pos_lines), "inline": False})
 
