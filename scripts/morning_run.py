@@ -53,13 +53,23 @@ def main() -> int:
         broker.record_signals(sig.date, sig.predicted_returns)
 
         cash = broker.get_cash()
-        budget_per_position = cash * 0.95 / max(len(long_tickers), 1)
+
+        # 当日終値ベースで「1口ずつ買えるか」を予測
+        latest_close = {}
+        for t in long_tickers:
+            if (t, "Close") in prices.columns:
+                series = prices[(t, "Close")].dropna()
+                if not series.empty:
+                    latest_close[t] = float(series.iloc[-1])
+
+        total_needed = sum(latest_close.get(t, 0) for t in long_tickers)
+        avg_price = total_needed / len(long_tickers) if long_tickers else 0
 
         notify_morning_signal(
             signal_date=sig.date.strftime("%Y-%m-%d"),
             long_tickers=long_tickers,
             predicted_returns=sig.predicted_returns.to_dict(),
-            target_value_per_position=budget_per_position,
+            target_value_per_position=avg_price,
             cash=cash,
         )
 

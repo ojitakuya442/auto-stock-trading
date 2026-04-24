@@ -75,22 +75,30 @@ def main() -> int:
         else:
             logger.info("No previous positions to close")
 
-        # === Step 2: 当日シグナルで新規建て（当日引け価格） ===
+        # === Step 2: 当日シグナルで新規建て（当日引け価格、整数口数） ===
+        # 実運用: NEXT FUNDS TOPIX-17 ETF は1口単位、kabu Station API でも整数口数
         sig = generate_signal(rcc)
         executed = []
+        skipped = []
         if sig is not None:
             broker.record_signals(sig.date, sig.predicted_returns)
 
             long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
-            cash = broker.get_cash()
-            budget_per_position = cash * 0.95 / max(len(long_tickers), 1)
 
+            # 予測リターン高い順に1口ずつ買付。残金で買えなければスキップ
             for t in long_tickers:
                 if t not in latest_close:
                     logger.warning(f"No price for {t}, skipping")
+                    skipped.append({"symbol": t, "reason": "価格データなし"})
                     continue
                 price = latest_close[t]
-                qty = budget_per_position / price
+                cash = broker.get_cash()
+                if price > cash:
+                    logger.warning(f"Insufficient cash for {t}: need ¥{price:,.0f}, have ¥{cash:,.0f}")
+                    skipped.append({"symbol": t, "reason": f"残金不足 (¥{price:,.0f}必要)"})
+                    continue
+
+                qty = 1  # 実運用準拠: 1口ずつ買付
                 try:
                     trade = broker.buy(t, qty=qty, price=price, note=f"signal={sig.predicted_returns[t]:+.4f}")
                     executed.append({
@@ -101,11 +109,12 @@ def main() -> int:
                     })
                 except Exception as e:
                     logger.exception(f"Failed to buy {t}: {e}")
+                    skipped.append({"symbol": t, "reason": str(e)})
         else:
             logger.warning("No signal generated, skipping new positions")
 
-        if executed:
-            notify_orders_executed(executed)
+        if executed or skipped:
+            notify_orders_executed(executed, skipped)
 
         # === Step 3: 日次サマリ通知 ===
         snap = broker.snapshot(latest_date, latest_close, note="evening")

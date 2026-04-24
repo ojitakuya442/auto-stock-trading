@@ -55,13 +55,13 @@ def notify_morning_signal(
 
     fields = [
         {"name": "ロング対象銘柄", "value": "\n".join(rank_lines) if rank_lines else "（なし）", "inline": False},
-        {"name": "1銘柄あたり予算", "value": f"¥{target_value_per_position:,.0f}", "inline": True},
-        {"name": "総キャッシュ", "value": f"¥{cash:,.0f}", "inline": True},
+        {"name": "想定平均価格/口", "value": f"¥{target_value_per_position:,.0f}", "inline": True},
+        {"name": "現在の総キャッシュ", "value": f"¥{cash:,.0f}", "inline": True},
     ]
 
     embed = {
-        "title": "📈 朝のシグナル",
-        "description": f"**{signal_date}** の予測に基づき、寄付で以下を仮想買付します。",
+        "title": "📈 朝のシグナル予告",
+        "description": f"**{signal_date}** の予測に基づき、本日引けで以下を1口ずつ仮想買付予定。",
         "color": COLOR_INFO,
         "fields": fields,
         "footer": {"text": "auto-stock-trading / PCA SUB strategy"},
@@ -69,14 +69,21 @@ def notify_morning_signal(
     return send_message(embeds=[embed])
 
 
-def notify_orders_executed(trades: list[dict]) -> bool:
-    """寄付後: 約定報告"""
-    if not trades:
+def notify_orders_executed(trades: list[dict], skipped: list[dict] | None = None) -> bool:
+    """引け後: 約定報告"""
+    if not trades and not skipped:
         return False
     lines = []
     for t in trades:
         emoji = "🟢" if t["side"] == "BUY" else "🔴"
-        lines.append(f"{emoji} {t['side']} **{t['symbol']}** {t['qty']:.2f}株 @ ¥{t['price']:,.2f}")
+        qty_str = f"{int(t['qty'])}口" if t['qty'] == int(t['qty']) else f"{t['qty']:.2f}口"
+        lines.append(f"{emoji} {t['side']} **{t['symbol']}** {qty_str} @ ¥{t['price']:,.0f}")
+
+    if skipped:
+        lines.append("")
+        lines.append("**⏭️ スキップ:**")
+        for s in skipped:
+            lines.append(f"・{s['symbol']}: {s['reason']}")
 
     embed = {
         "title": "✅ 仮想約定",
@@ -113,7 +120,8 @@ def notify_daily_summary(
     if positions_detail:
         pos_lines = []
         for p in positions_detail[:10]:
-            pos_lines.append(f"`{p['symbol']}` {p['qty']:.2f}株 (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
+            qty_str = f"{int(p['qty'])}口" if p['qty'] == int(p['qty']) else f"{p['qty']:.2f}口"
+            pos_lines.append(f"`{p['symbol']}` {qty_str} (取得¥{p['avg_cost']:,.0f} → 現¥{p['current_price']:,.0f}, {p['pnl_pct']:+.2f}%)")
         if pos_lines:
             fields.append({"name": "保有ポジション", "value": "\n".join(pos_lines), "inline": False})
 

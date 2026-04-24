@@ -16,7 +16,7 @@ PAPER_DB_PATH = DATA_DIR / "paper_trading.db"
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 MODE = os.getenv("MODE", "paper")
-PAPER_INITIAL_CAPITAL = float(os.getenv("PAPER_INITIAL_CAPITAL", "100000"))
+PAPER_INITIAL_CAPITAL = float(os.getenv("PAPER_INITIAL_CAPITAL", "150000"))
 
 # 米国 Select Sector SPDR ETF（11銘柄）
 US_TICKERS: list[str] = [
