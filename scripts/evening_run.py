@@ -1,9 +1,12 @@
-"""引け後の夕方実行スクリプト
+"""引け実行スクリプト：close-to-close 戦略の中核
 
 GitHub Actions の cron で 06:35 UTC（日本時間 15:35）に起動。
 1. 当日終値を yfinance で取得
-2. 全ポジションをクローズ
-3. 日次サマリを Discord 通知
+2. 既存ポジションを当日引けでクローズ（前日エントリーの決済）
+3. 当日シグナルに基づいて新規ポジションを当日引けで建てる
+4. 日次サマリを Discord 通知
+
+戦略: 前日米国引け情報 → 当日シグナル生成 → 当日引けで新規建て → 翌日引けで決済
 """
 from __future__ import annotations
 
@@ -14,12 +17,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import pandas as pd
-
-from auto_stock_trading.config import JP_TICKERS, US_TICKERS
-from auto_stock_trading.data import fetch_all
-from auto_stock_trading.notify import notify_daily_summary, notify_error
+from auto_stock_trading.config import (
+    JP_TICKERS,
+    N_LONG_POSITIONS,
+    US_TICKERS,
+)
+from auto_stock_trading.data import close_to_close_returns, fetch_all
+from auto_stock_trading.notify import (
+    notify_daily_summary,
+    notify_error,
+    notify_orders_executed,
+)
 from auto_stock_trading.paper_broker import PaperBroker
+from auto_stock_trading.strategy import generate_signal
 
 
 def main() -> int:
@@ -29,9 +39,12 @@ def main() -> int:
     try:
         logger.info("=== Evening run started ===")
 
-        prices = fetch_all(start="2024-01-01", use_cache=False)
+        prices = fetch_all(start="2010-01-01", use_cache=False)
         logger.info(f"Fetched prices: shape={prices.shape}")
 
+        rcc = close_to_close_returns(prices, US_TICKERS + JP_TICKERS)
+
+        # 当日終値（仮想取引で使用）
         latest_close = {}
         for t in JP_TICKERS + US_TICKERS:
             if (t, "Close") in prices.columns:
@@ -39,11 +52,13 @@ def main() -> int:
                 if not series.empty:
                     latest_close[t] = float(series.iloc[-1])
 
+        latest_date = prices.index.max()
         broker = PaperBroker()
 
-        positions = broker.get_positions()
+        # === Step 1: 既存ポジション（前日建て）を当日引けでクローズ ===
+        positions_before = broker.get_positions()
         positions_detail = []
-        for p in positions:
+        for p in positions_before:
             current = latest_close.get(p.symbol, p.avg_cost)
             pnl_pct = (current - p.avg_cost) / p.avg_cost * 100
             positions_detail.append({
@@ -54,13 +69,45 @@ def main() -> int:
                 "pnl_pct": pnl_pct,
             })
 
-        if positions:
-            logger.info(f"Closing {len(positions)} positions")
+        if positions_before:
+            logger.info(f"Closing {len(positions_before)} positions from previous session")
             broker.close_all(latest_close, note="end-of-day close")
         else:
-            logger.info("No positions to close")
+            logger.info("No previous positions to close")
 
-        latest_date = prices.index.max()
+        # === Step 2: 当日シグナルで新規建て（当日引け価格） ===
+        sig = generate_signal(rcc)
+        executed = []
+        if sig is not None:
+            broker.record_signals(sig.date, sig.predicted_returns)
+
+            long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
+            cash = broker.get_cash()
+            budget_per_position = cash * 0.95 / max(len(long_tickers), 1)
+
+            for t in long_tickers:
+                if t not in latest_close:
+                    logger.warning(f"No price for {t}, skipping")
+                    continue
+                price = latest_close[t]
+                qty = budget_per_position / price
+                try:
+                    trade = broker.buy(t, qty=qty, price=price, note=f"signal={sig.predicted_returns[t]:+.4f}")
+                    executed.append({
+                        "symbol": trade.symbol,
+                        "side": trade.side,
+                        "qty": trade.qty,
+                        "price": trade.price,
+                    })
+                except Exception as e:
+                    logger.exception(f"Failed to buy {t}: {e}")
+        else:
+            logger.warning("No signal generated, skipping new positions")
+
+        if executed:
+            notify_orders_executed(executed)
+
+        # === Step 3: 日次サマリ通知 ===
         snap = broker.snapshot(latest_date, latest_close, note="evening")
         logger.info(f"Snapshot: total=¥{snap['total_value']:,.0f}, pnl_today=¥{snap['pnl_today']:+,.0f}")
 
@@ -81,7 +128,7 @@ def main() -> int:
 
     except Exception as e:
         logger.exception("Evening run failed")
-        notify_error("夕方の実行失敗", f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
+        notify_error("引け実行失敗", f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
         return 1
 
 

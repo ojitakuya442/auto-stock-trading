@@ -1,10 +1,12 @@
-"""寄付前の朝実行スクリプト
+"""朝の予告通知スクリプト（実取引なし）
 
-GitHub Actions の cron で 23:50 UTC（日本時間 8:50）に起動。
-1. 米国前日終値（および日本も）まで yfinance で取得
+GitHub Actions の cron で 23:53 UTC（日本時間 8:53）に起動。
+1. 米国前日終値まで yfinance で取得
 2. PCA SUB 戦略でシグナル生成
-3. 上位 N 銘柄を仮想買付（前日の引け価格で代用、当日寄付不明なため）
-4. Discord 通知
+3. 当日引けで仮想取引する候補銘柄を Discord に予告通知
+
+実際の取引は引け実行 (evening_run.py) で行う (close-to-close strategy)。
+本スクリプトはユーザーが「今日の取引内容」を引け前に確認できるようにするためのもの。
 """
 from __future__ import annotations
 
@@ -15,20 +17,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-import pandas as pd
-
 from auto_stock_trading.config import (
     JP_TICKERS,
     N_LONG_POSITIONS,
-    QUANTILE,
     US_TICKERS,
 )
 from auto_stock_trading.data import close_to_close_returns, fetch_all
-from auto_stock_trading.notify import (
-    notify_error,
-    notify_morning_signal,
-    notify_orders_executed,
-)
+from auto_stock_trading.notify import notify_error, notify_morning_signal
 from auto_stock_trading.paper_broker import PaperBroker
 from auto_stock_trading.strategy import generate_signal
 
@@ -38,7 +33,7 @@ def main() -> int:
     logger = logging.getLogger(__name__)
 
     try:
-        logger.info("=== Morning run started ===")
+        logger.info("=== Morning preview started ===")
 
         prices = fetch_all(start="2010-01-01", use_cache=False)
         logger.info(f"Fetched prices: shape={prices.shape}")
@@ -48,23 +43,17 @@ def main() -> int:
 
         sig = generate_signal(rcc)
         if sig is None:
-            notify_error("Signal生成失敗", "シグナルを生成できませんでした（データ不足か要確認）")
+            notify_error("Signal生成失敗", "シグナルを生成できませんでした")
             return 1
 
-        logger.info(f"Signal date: {sig.date}, top long candidates: {sig.long_tickers}")
+        long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
+        logger.info(f"Signal date: {sig.date}, top long candidates: {long_tickers}")
 
         broker = PaperBroker()
         broker.record_signals(sig.date, sig.predicted_returns)
 
-        existing = {p.symbol for p in broker.get_positions()}
-        if existing:
-            logger.warning(f"Positions exist from yesterday, expected to be closed: {existing}")
-
         cash = broker.get_cash()
-        long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
-        budget_per_position = cash * 0.95 / len(long_tickers)
-
-        latest_close = {t: prices[(t, "Close")].dropna().iloc[-1] for t in long_tickers if (t, "Close") in prices.columns}
+        budget_per_position = cash * 0.95 / max(len(long_tickers), 1)
 
         notify_morning_signal(
             signal_date=sig.date.strftime("%Y-%m-%d"),
@@ -74,33 +63,12 @@ def main() -> int:
             cash=cash,
         )
 
-        executed = []
-        for t in long_tickers:
-            if t not in latest_close:
-                logger.warning(f"No price for {t}, skipping")
-                continue
-            price = latest_close[t]
-            qty = budget_per_position / price
-            try:
-                trade = broker.buy(t, qty=qty, price=price, note=f"signal={sig.predicted_returns[t]:+.4f}")
-                executed.append({
-                    "symbol": trade.symbol,
-                    "side": trade.side,
-                    "qty": trade.qty,
-                    "price": trade.price,
-                })
-            except Exception as e:
-                logger.exception(f"Failed to buy {t}: {e}")
-
-        if executed:
-            notify_orders_executed(executed)
-
-        logger.info(f"=== Morning run done. Executed {len(executed)} orders ===")
+        logger.info("=== Morning preview done (notification only, no trades) ===")
         return 0
 
     except Exception as e:
-        logger.exception("Morning run failed")
-        notify_error("朝の実行失敗", f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
+        logger.exception("Morning preview failed")
+        notify_error("朝の予告通知失敗", f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
         return 1
 
 

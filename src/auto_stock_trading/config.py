@@ -91,8 +91,10 @@ LAMBDA = 0.9  # 正則化強度
 QUANTILE = 0.3  # ロング/ショート分位点
 
 # ロングオンリー版（10万円対応）
-N_LONG_POSITIONS = 5  # 上位N銘柄をロング
-TRANSACTION_COST = 0.001  # 片道0.1%（保守的見積）
+# 実証: close-to-close (前日引け→翌日引け), top 3 が最良
+# AR 39.11% / Sharpe 2.05 / MDD -21.97% (2015-2026, cost=0)
+N_LONG_POSITIONS = 3
+TRANSACTION_COST = 0.0  # kabu Station API: 1日100万円まで無料 → 実質ゼロ
 
 # インサイダー対象銘柄ブラックリスト（環境変数で管理。コミット禁止）
 # .env: INSIDER_BLACKLIST=7203.T,9984.T のようにカンマ区切りで指定
