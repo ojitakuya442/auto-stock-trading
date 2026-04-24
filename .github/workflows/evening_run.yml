@@ -32,7 +32,7 @@ jobs:
 
       - name: 夕方の実行
         env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL_AUTO_STOCK }}
           MODE: paper
           INSIDER_BLACKLIST: ${{ secrets.INSIDER_BLACKLIST }}
         run: uv run python scripts/evening_run.py

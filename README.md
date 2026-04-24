@@ -69,7 +69,7 @@ uv run python scripts/evening_run.py
 2. URL をコピー
 3. ローカル: `cp .env.example .env` → `DISCORD_WEBHOOK_URL` に貼付
 4. GitHub: リポジトリ Settings → Secrets and variables → Actions → New secret
-   - 名前: `DISCORD_WEBHOOK_URL`
+   - 名前: `DISCORD_WEBHOOK_URL_AUTO_STOCK`
    - 値: コピーしたURL
 5. （任意）`INSIDER_BLACKLIST` Secret も設定（例: `7203.T,9984.T`）
 
