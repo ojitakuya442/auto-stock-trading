@@ -1,0 +1,47 @@
+name: 引け後の仮想取引（クローズ + 日次サマリ）
+
+on:
+  schedule:
+    # 06:35 UTC = 15:35 JST (月-金 引け後)
+    - cron: "35 6 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  evening-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: uv インストール
+        uses: astral-sh/setup-uv@v3
+
+      - name: 依存パッケージ
+        run: uv sync
+
+      - name: 夕方の実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MODE: paper
+          INSIDER_BLACKLIST: ${{ secrets.INSIDER_BLACKLIST }}
+        run: uv run python scripts/evening_run.py
+
+      - name: DB変更をコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/*.db || true
+          git diff --cached --quiet || git commit -m "🌆 引けクローズ + 日次サマリ $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase origin main || true
+          git push || echo "Push failed, will retry next run"

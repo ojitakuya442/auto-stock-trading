@@ -1,0 +1,17 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.ipynb_checkpoints/
+
+# Allow paper trading DB to be committed (so GitHub Actions persists state)
+# data/*.db is intentionally tracked for paper trading state persistence
+data/cache/
+data/raw/
+*.log

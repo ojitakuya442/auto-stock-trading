@@ -1,0 +1,47 @@
+name: 朝の仮想取引（寄付前シグナル生成）
+
+on:
+  schedule:
+    # 23:53 UTC = 8:53 JST (日-木 → 月-金 朝)
+    - cron: "53 23 * * 0-4"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  morning-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python セットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: uv インストール
+        uses: astral-sh/setup-uv@v3
+
+      - name: 依存パッケージ
+        run: uv sync
+
+      - name: 朝の実行
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MODE: paper
+          INSIDER_BLACKLIST: ${{ secrets.INSIDER_BLACKLIST }}
+        run: uv run python scripts/morning_run.py
+
+      - name: DB変更をコミット
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f data/*.db || true
+          git diff --cached --quiet || git commit -m "🌅 朝のシグナル + 仮想買付 $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git pull --rebase origin main || true
+          git push || echo "Push failed, will retry next run"
