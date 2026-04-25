@@ -23,7 +23,12 @@ from auto_stock_trading.config import (
     US_TICKERS,
 )
 from auto_stock_trading.data import close_to_close_returns, fetch_all
-from auto_stock_trading.notify import notify_error, notify_morning_signal
+from auto_stock_trading.market_calendar import is_jp_trading_day, today_jst_str
+from auto_stock_trading.notify import (
+    notify_error,
+    notify_holiday_skip,
+    notify_morning_signal,
+)
 from auto_stock_trading.paper_broker import PaperBroker
 from auto_stock_trading.strategy import generate_signal
 
@@ -34,6 +39,12 @@ def main() -> int:
 
     try:
         logger.info("=== Morning preview started ===")
+
+        is_open, reason = is_jp_trading_day()
+        if not is_open:
+            logger.info(f"東証休場のためスキップ: {reason}")
+            notify_holiday_skip(today_jst_str(), reason, "朝の予告通知")
+            return 0
 
         prices = fetch_all(start="2010-01-01", use_cache=False)
         logger.info(f"Fetched prices: shape={prices.shape}")

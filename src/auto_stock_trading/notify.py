@@ -149,6 +149,17 @@ def notify_daily_summary(
     return send_message(embeds=[embed])
 
 
+def notify_holiday_skip(today_str: str, reason: str, context: str) -> bool:
+    """祝日・休場日でスキップしたことを通知"""
+    embed = {
+        "title": "🎌 本日は東証休場",
+        "description": f"**{today_str}** は{reason}のため、{context}をスキップしました。",
+        "color": COLOR_INFO,
+        "footer": {"text": "auto-stock-trading"},
+    }
+    return send_message(embeds=[embed])
+
+
 def notify_error(title: str, message: str) -> bool:
     """エラー通知"""
     embed = {

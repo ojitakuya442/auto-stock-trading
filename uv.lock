@@ -36,6 +36,7 @@ name = "auto-stock-trading"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "jpholiday" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "python-dotenv" },
@@ -56,6 +57,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.29.0" },
+    { name = "jpholiday", specifier = ">=0.1.10" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.8.0" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "pandas", specifier = ">=2.2.0" },
@@ -623,6 +625,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/41/f2/d34e8b3a08a9cc79a50b2208a93dce981fe615b64d5a4d4abee421d898df/joblib-1.5.3.tar.gz", hash = "sha256:8561a3269e6801106863fd0d6d84bb737be9e7631e33aaed3fb9ce5953688da3", size = 331603, upload-time = "2025-12-15T08:41:46.427Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl", hash = "sha256:5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713", size = 309071, upload-time = "2025-12-15T08:41:44.973Z" },
+]
+
+[[package]]
+name = "jpholiday"
+version = "1.0.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/5c/0c/1178e0d55e66362c6f2e715aa1665b032be71bf9b9c80a9fe83238d33c81/jpholiday-1.0.3.tar.gz", hash = "sha256:d5a56592fd6a7ceb76d49e1c5f1af806223e0d5d6b9e3bc5477860e6605f4cab", size = 12575, upload-time = "2025-12-26T05:28:11.767Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/11/e9/af0b8cda67530d7ff3d937b785c7901041e38a955b6b66e3c9a23a0d2027/jpholiday-1.0.3-py3-none-any.whl", hash = "sha256:abe5f0191f27a88623a33aaaa7cd04035886b5d7adb41a42eaeba0e721dc1982", size = 16257, upload-time = "2025-12-26T05:28:10.489Z" },
 ]
 
 [[package]]
