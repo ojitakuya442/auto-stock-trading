@@ -50,7 +50,9 @@ def main() -> int:
         logger.info(f"Fetched prices: shape={prices.shape}")
 
         rcc = close_to_close_returns(prices, US_TICKERS + JP_TICKERS)
-        logger.info(f"Computed rcc: shape={rcc.shape}, last_date={rcc.dropna().index[-1]}")
+        non_nan_idx = rcc.dropna(how="all").index
+        last_date = non_nan_idx[-1] if len(non_nan_idx) else "N/A"
+        logger.info(f"Computed rcc: shape={rcc.shape}, last_date={last_date}")
 
         sig = generate_signal(rcc)
         if sig is None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -14,6 +15,17 @@ logger = logging.getLogger(__name__)
 
 CACHE_DIR = DATA_DIR / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
+
+
+def _missing_tickers(out: pd.DataFrame, tickers: list[str]) -> list[str]:
+    """価格データが取得できていないティッカーを返す。"""
+    missing = []
+    for t in tickers:
+        if (t, "Close") not in out.columns:
+            missing.append(t)
+        elif out[(t, "Close")].dropna().empty:
+            missing.append(t)
+    return missing
 
 
 def fetch_prices(
@@ -36,6 +48,7 @@ def fetch_prices(
         return pd.read_pickle(cache_path)
 
     logger.info(f"Fetching {len(tickers)} tickers from yfinance ({start} to {end})")
+    # threads=False: yfinance 内部の TzCache (SQLite) ロック競合を避ける
     df = yf.download(
         tickers,
         start=start,
@@ -43,13 +56,48 @@ def fetch_prices(
         auto_adjust=True,
         progress=False,
         group_by="ticker",
+        threads=False,
     )
 
     if isinstance(df.columns, pd.MultiIndex):
-        out = df.loc[:, pd.IndexSlice[:, ["Open", "Close"]]]
+        out = df.loc[:, pd.IndexSlice[:, ["Open", "Close"]]].copy()
     else:
         out = df[["Open", "Close"]].copy()
         out.columns = pd.MultiIndex.from_product([[tickers[0]], out.columns])
+
+    # 欠損銘柄を個別ダウンロードでリトライ（一過性のロック対策）
+    for attempt in range(2):
+        missing = _missing_tickers(out, tickers)
+        if not missing:
+            break
+        logger.warning(f"Retrying missing tickers (attempt {attempt + 1}): {missing}")
+        for t in missing:
+            time.sleep(1)
+            try:
+                retry = yf.download(
+                    t,
+                    start=start,
+                    end=end,
+                    auto_adjust=True,
+                    progress=False,
+                    threads=False,
+                )
+                if retry is None or retry.empty:
+                    continue
+                if isinstance(retry.columns, pd.MultiIndex):
+                    for field in ("Open", "Close"):
+                        if (t, field) in retry.columns:
+                            out[(t, field)] = retry[(t, field)]
+                else:
+                    for field in ("Open", "Close"):
+                        if field in retry.columns:
+                            out[(t, field)] = retry[field]
+            except Exception as e:
+                logger.warning(f"Retry failed for {t}: {e}")
+
+    still_missing = _missing_tickers(out, tickers)
+    if still_missing:
+        logger.error(f"Tickers still missing after retries: {still_missing}")
 
     out = out.dropna(how="all")
     if use_cache:
