@@ -106,11 +106,15 @@ def main() -> int:
                 price = latest_close[t]
                 cash = broker.get_cash()
 
+                # 等ウェイト上限内で最大口数。上限を超えても現金があれば最低1口は買う（バッファで吸収）
                 max_qty = int(min(budget_per_ticker, cash) // price)
                 if max_qty < 1:
-                    logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, budget=¥{budget_per_ticker:,.0f}")
-                    skipped.append({"symbol": t, "reason": f"予算不足 (¥{price:,.0f}/口, 上限¥{budget_per_ticker:,.0f})"})
-                    continue
+                    if price <= cash:
+                        max_qty = 1  # 上限オーバーだがバッファで吸収して1口購入
+                    else:
+                        logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, cash=¥{cash:,.0f}")
+                        skipped.append({"symbol": t, "reason": f"現金不足 (¥{price:,.0f}/口)"})
+                        continue
 
                 try:
                     trade = broker.buy(t, qty=float(max_qty), price=price, note=f"signal={sig.predicted_returns[t]:+.4f} qty={max_qty}")

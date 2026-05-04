@@ -16,7 +16,8 @@ PAPER_DB_PATH = DATA_DIR / "paper_trading.db"
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 MODE = os.getenv("MODE", "paper")
-PAPER_INITIAL_CAPITAL = float(os.getenv("PAPER_INITIAL_CAPITAL", "150000"))
+PAPER_INITIAL_CAPITAL = float(os.getenv("PAPER_INITIAL_CAPITAL", "300000"))
+INVEST_RATIO = float(os.getenv("INVEST_RATIO", "0.80"))  # 投資比率: 総資産の80%を株に配分
 
 # 米国 Select Sector SPDR ETF（11銘柄）
 US_TICKERS: list[str] = [
