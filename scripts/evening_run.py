@@ -93,7 +93,8 @@ def main() -> int:
 
             long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
 
-            # 予算均等割り: 総資産 × 70% を N 銘柄で等分した上限内で最大整数口数を購入
+            # 等ウェイト配分: 総資産 × 70% を N 銘柄で均等割り → 各銘柄の上限予算内で最大整数口数を購入
+            # 論文の equal-weight top-N を整数口数制約で近似する
             total_capital = broker.total_value(latest_close)
             budget_per_ticker = total_capital * 0.70 / N_LONG_POSITIONS
 
@@ -105,10 +106,9 @@ def main() -> int:
                 price = latest_close[t]
                 cash = broker.get_cash()
 
-                # 予算上限と手持ち現金の小さい方で何口買えるか
                 max_qty = int(min(budget_per_ticker, cash) // price)
                 if max_qty < 1:
-                    logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, budget_per_ticker=¥{budget_per_ticker:,.0f}")
+                    logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, budget=¥{budget_per_ticker:,.0f}")
                     skipped.append({"symbol": t, "reason": f"予算不足 (¥{price:,.0f}/口, 上限¥{budget_per_ticker:,.0f})"})
                     continue
 
