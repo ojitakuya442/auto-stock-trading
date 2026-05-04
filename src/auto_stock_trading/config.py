@@ -137,6 +137,10 @@ US_SECTOR_TYPE: dict[str, int] = {
     "XLV": -1,
 }
 
+# 売買単位（最低購入口数）。NEXT FUNDS 公式より。1629.T のみ10口、他は1口
+LOT_SIZE: dict[str, int] = {t: 1 for t in JP_TICKERS}
+LOT_SIZE["1629.T"] = 10
+
 # 戦略パラメータ（論文 §4.3 のデフォルト）
 ROLLING_WINDOW = 60  # L: ローリング推定ウィンドウ長
 N_FACTORS = 3  # K: 主成分数

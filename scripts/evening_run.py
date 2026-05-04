@@ -18,7 +18,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from auto_stock_trading.config import (
+    INVEST_RATIO,
     JP_TICKERS,
+    LOT_SIZE,
     N_LONG_POSITIONS,
     US_TICKERS,
 )
@@ -93,10 +95,10 @@ def main() -> int:
 
             long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
 
-            # 等ウェイト配分: 総資産 × 70% を N 銘柄で均等割り → 各銘柄の上限予算内で最大整数口数を購入
+            # 等ウェイト配分: 総資産 × INVEST_RATIO を N 銘柄で均等割り → 各銘柄の上限予算内で最大ロット数を購入
             # 論文の equal-weight top-N を整数口数制約で近似する
             total_capital = broker.total_value(latest_close)
-            budget_per_ticker = total_capital * 0.70 / N_LONG_POSITIONS
+            budget_per_ticker = total_capital * INVEST_RATIO / N_LONG_POSITIONS
 
             for t in long_tickers:
                 if t not in latest_close:
@@ -104,17 +106,20 @@ def main() -> int:
                     skipped.append({"symbol": t, "reason": "価格データなし"})
                     continue
                 price = latest_close[t]
+                lot = LOT_SIZE.get(t, 1)
+                lot_price = price * lot  # 1ロットの購入金額
                 cash = broker.get_cash()
 
-                # 等ウェイト上限内で最大口数。上限を超えても現金があれば最低1口は買う（バッファで吸収）
-                max_qty = int(min(budget_per_ticker, cash) // price)
-                if max_qty < 1:
-                    if price <= cash:
-                        max_qty = 1  # 上限オーバーだがバッファで吸収して1口購入
+                # 等ウェイト上限内で最大ロット数。上限超でも現金があれば最低1ロット購入（バッファで吸収）
+                max_lots = int(min(budget_per_ticker, cash) // lot_price)
+                if max_lots < 1:
+                    if lot_price <= cash:
+                        max_lots = 1  # 上限オーバーだがバッファで吸収して1ロット購入
                     else:
-                        logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, cash=¥{cash:,.0f}")
-                        skipped.append({"symbol": t, "reason": f"現金不足 (¥{price:,.0f}/口)"})
+                        logger.warning(f"Cannot afford {t}: lot_price=¥{lot_price:,.0f}, cash=¥{cash:,.0f}")
+                        skipped.append({"symbol": t, "reason": f"現金不足 (¥{lot_price:,.0f}/ロット)"})
                         continue
+                max_qty = max_lots * lot
 
                 try:
                     trade = broker.buy(t, qty=float(max_qty), price=price, note=f"signal={sig.predicted_returns[t]:+.4f} qty={max_qty}")
