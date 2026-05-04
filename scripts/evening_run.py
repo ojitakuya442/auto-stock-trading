@@ -93,7 +93,10 @@ def main() -> int:
 
             long_tickers = sig.long_tickers[:N_LONG_POSITIONS]
 
-            # 予測リターン高い順に1口ずつ買付。残金で買えなければスキップ
+            # 予算均等割り: 総資産 × 70% を N 銘柄で等分した上限内で最大整数口数を購入
+            total_capital = broker.total_value(latest_close)
+            budget_per_ticker = total_capital * 0.70 / N_LONG_POSITIONS
+
             for t in long_tickers:
                 if t not in latest_close:
                     logger.warning(f"No price for {t}, skipping")
@@ -101,14 +104,16 @@ def main() -> int:
                     continue
                 price = latest_close[t]
                 cash = broker.get_cash()
-                if price > cash:
-                    logger.warning(f"Insufficient cash for {t}: need ¥{price:,.0f}, have ¥{cash:,.0f}")
-                    skipped.append({"symbol": t, "reason": f"残金不足 (¥{price:,.0f}必要)"})
+
+                # 予算上限と手持ち現金の小さい方で何口買えるか
+                max_qty = int(min(budget_per_ticker, cash) // price)
+                if max_qty < 1:
+                    logger.warning(f"Cannot afford {t}: price=¥{price:,.0f}, budget_per_ticker=¥{budget_per_ticker:,.0f}")
+                    skipped.append({"symbol": t, "reason": f"予算不足 (¥{price:,.0f}/口, 上限¥{budget_per_ticker:,.0f})"})
                     continue
 
-                qty = 1  # 実運用準拠: 1口ずつ買付
                 try:
-                    trade = broker.buy(t, qty=qty, price=price, note=f"signal={sig.predicted_returns[t]:+.4f}")
+                    trade = broker.buy(t, qty=float(max_qty), price=price, note=f"signal={sig.predicted_returns[t]:+.4f} qty={max_qty}")
                     executed.append({
                         "symbol": trade.symbol,
                         "side": trade.side,
